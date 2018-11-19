@@ -9,29 +9,66 @@
   $sender_txt = $json_obj->events[0]->message->text; //取得訊息內容
   $sender_replyToken = $json_obj->events[0]->replyToken; //取得訊息的replyToken
   
-  $sender_txt=rawurlencode($sender_txt); //因為使用get的方式呼叫luis api，所以需要轉碼
-  $ch = curl_init('https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/bb99eed8-a63a-46b4-a216-bd5b034e7056?subscription-key=412f95a7936d4596be6814be2a3c7473&timezoneOffset=-360&q='.$sender_txt);                                                                      
-  curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "GET");                                                                                                                          
+  $imageId = $json_obj->events[0]->message->id; //取得訊息編號
+  $url = 'https://api.line.me/v2/bot/message/'.$imageId.'/content';
+  $ch = curl_init($url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-  $result_str = curl_exec($ch);
-  fwrite($myfile, "\xEF\xBB\xBF".$result_str); //在字串前加上\xEF\xBB\xBF轉成utf8格式
-  $result = json_decode($result_str);
-  $ans_txt = $result -> topScoringIntent -> intent;
+  curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+    'Authorization: Bearer gd1gyH+Pc5TROu9ku5u/5tDvFnffsU8nXU69zXuhTgE0dIS5nVGmx9Js8PwijeUqgFuwWXzyJ14/N5FUmp/UXsmSJbUsxMGA6AW1gozlf6cbEgSGLiC02BEaRa5wUSqE7df8FOANP1WjPW8Mh/TgtwdB04t89/1O/w1cDnyilFU='
+  ));
+  $json_content = curl_exec($ch);
+  curl_close($ch);
+  $imagefile = fopen($imageId.".jpeg", "w+") or die("Unable to open file!");
+  fwrite($imagefile, $json_content); 
+  fclose($imagefile); //將圖片存在server上
+			
+  $header[] = "Content-Type: application/json";
+  $post_data = array (
+	"requests" => array (
+	  array (
+		"image" => array (
+		  "source" => array (
+			"imageUri" => "http://139.59.123.8/class/learning/".$imageId.".jpeg"
+		  )
+		),
+		"features" => array (
+		  array (
+			"type" => "TEXT_DETECTION",
+			"maxResults" => 1
+		  )
+		)
+	  )
+	)
+  );
+  $ch = curl_init('https://vision.googleapis.com/v1/images:annotate?key=AIzaSyCiyGiCfjzzPR1JS8PrAxcsQWHdbycVwmg');                                                                      
+  curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");                                                                     
+  curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($post_data));                                                                  
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                                                                      
+  curl_setopt($ch, CURLOPT_HTTPHEADER, $header);                                                                                                   
+  $result = json_decode(curl_exec($ch));
+  $result_ary = mb_split("\n",$result -> responses[0] -> fullTextAnnotation -> text);
+  $ans_txt = "這張發票沒用了，你又製造了一張垃圾";
+  foreach ($result_ary as $val) {
+	if($val == "JS-07510912"){
+	  $ans_txt = "恭喜您中獎啦，快分紅!!";
+	}
+  }
   $response = array (
-    "to" => $sender_userid,
-    "messages" => array (
-      array (
-        "type" => "text",
-        "text" => $ans_txt
-      )
-    )
+	"replyToken" => $sender_replyToken,
+	"messages" => array (
+	  array (
+		"type" => "text",
+		"text" => $ans_txt
+		//"text" => $result -> responses[0] -> fullTextAnnotation -> text
+	  )
+	)
   );
   
   
- fwrite($myfile, "\xEF\xBB\xBF".json_encode($response)); //在字串前面加上\xEF\xBB\xBF轉成utf8格式
+  fwrite($myfile, "\xEF\xBB\xBF".json_encode($response)); //在字串前面加上\xEF\xBB\xBF轉成utf8格式
   $header[] = "Content-Type: application/json";
   $header[] = "Authorization: Bearer Li9/ePqVK/aOUDxmZXzWJY1x2fKKZjs62TX1/fw6KmI/n6opoMKliLv9UuDDUVVUMmkmR2DM1JjYLUZrQV/E0eebmTSn29ng2xp9bplIOpax92INO3HQoFLPRD8n2CX7CmevgcPzw/UDiWPv09lJTAdB04t89/1O/w1cDnyilFU=";
-  $ch = curl_init("https://api.line.me/v2/bot/message/push");
+  $ch = curl_init("https://api.line.me/v2/bot/message/reply");
   curl_setopt($ch, CURLOPT_CUSTOMREQUEST, "POST");
   curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($response));                                                                  
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);                                                                      
